@@ -117,7 +117,7 @@ class YoloDetector:
                 lm = list(map(int,[i*w if j%2==0 else i*h for j,i in enumerate(lm)]))
                 lm = [lm[i:i+2] for i in range(0,len(lm),2)]
                 conf = det[j,4:5].tolist()
-                confs.append(conf)
+                confs[i].append(conf)
                 bboxes[i].append(box)
                 landmarks[i].append(lm)
         return bboxes, confs, landmarks
@@ -162,9 +162,9 @@ class YoloDetector:
         images = self._preprocess(images)
         with torch.inference_mode(): # change this with torch.no_grad() for pytorch <1.8 compatibility
             pred = self.detector(images)[0]
-        bboxes, points = self._postprocess(images, origimgs, pred, conf_thres, iou_thres)
+        bboxes, confs, landmarks = self._postprocess(images, origimgs, pred, conf_thres, iou_thres)
 
-        return bboxes, points
+        return bboxes, confs, landmarks
 
     def __call__(self,*args):
         return self.predict(*args)
