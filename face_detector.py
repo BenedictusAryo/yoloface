@@ -1,3 +1,4 @@
+import logging
 import joblib
 import os
 import sys
@@ -28,8 +29,12 @@ class YoloDetector:
             frontal : if True tries to filter nonfrontal faces by keypoints location.
             """
             self._class_path = pathlib.Path(__file__).parent.absolute()#os.path.dirname(inspect.getfile(self.__class__))
-            self.gpu = gpu
-            #os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
+            if gpu != 'cpu':
+                if not torch.cuda.is_available():
+                    logging.info('CUDA GPU Not Available, switch to CPU')
+                    self.gpu = 'cpu'
+                else:
+                    self.gpu = gpu
             self.target_size = target_size
             self.min_face = min_face
             self.frontal = frontal
@@ -38,7 +43,7 @@ class YoloDetector:
             self.detector = self.init_detector(weights_name,config_name)
 
     def init_detector(self,weights_name,config_name):
-        print(self.gpu)
+        """Initialize Detector"""
         if type(self.gpu) == int and self.gpu >= 0:
             os.environ['CUDA_VISIBLE_DEVICES'] = str(self.gpu)
             self.device = 'cuda:0'
@@ -46,7 +51,7 @@ class YoloDetector:
             os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
             self.device = 'cpu'
         model_path = os.path.join(self._class_path,'weights/',weights_name)
-        print(model_path)
+        # print(model_path)
         config_path = os.path.join(self._class_path,'models/',config_name)
         state_dict = torch.load(model_path)
         detector = Model(cfg=config_path)
@@ -88,8 +93,9 @@ class YoloDetector:
                 bboxes: list of arrays with 4 coordinates of bounding boxes with format x1,y1,x2,y2.
                 points: list of arrays with coordinates of 5 facial keypoints (eyes, nose, lips corners).
         """
-        bboxes = [[] for i in range(len(origimgs))]
-        landmarks = [[] for i in range(len(origimgs))]
+        bboxes = [[] for _ in range(len(origimgs))]
+        confs = [[] for _ in range((len(origimgs)))]
+        landmarks = [[] for _ in range(len(origimgs))]
         
         pred = non_max_suppression_face(pred, conf_thres, iou_thres)
         
@@ -110,9 +116,11 @@ class YoloDetector:
                 lm = (det[j, 5:15].view(1, 10) / gn_lks).view(-1).tolist()
                 lm = list(map(int,[i*w if j%2==0 else i*h for j,i in enumerate(lm)]))
                 lm = [lm[i:i+2] for i in range(0,len(lm),2)]
+                conf = det[j,4:5].tolist()
+                confs.append(conf)
                 bboxes[i].append(box)
                 landmarks[i].append(lm)
-        return bboxes, landmarks
+        return bboxes, confs, landmarks
 
     def get_frontal_predict(self, box, points):
         '''
@@ -154,7 +162,6 @@ class YoloDetector:
         images = self._preprocess(images)
         with torch.inference_mode(): # change this with torch.no_grad() for pytorch <1.8 compatibility
             pred = self.detector(images)[0]
-            #pred = non_max_suppression_face(pred, conf_thres, iou_thres)
         bboxes, points = self._postprocess(images, origimgs, pred, conf_thres, iou_thres)
 
         return bboxes, points
