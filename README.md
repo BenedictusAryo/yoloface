@@ -27,7 +27,7 @@ Currently Support YOLOv5 type n,m & l type of model from [yolov5-face](https://g
 Example below:
 
 ```python
-model = YoloFace(yolo_type='yolov5l',target_size=720) # Will download weight file automatically
+model = YoloDetector(yolo_type='yolov5l',target_size=720) # Will download weight file automatically
 bboxes, confs, points = model.predict(rgb_array_img)
 ```
 
